@@ -1,0 +1,26 @@
+---
+- name: Post-Deployment System Optimization and Hardening
+  hosts: local
+  become: true  # باش يخدم بـ صلاحيات sudo أوتوماتيكياً
+
+  tasks:
+    - name: 1. Mettre à jour le cache APT (apt update)
+      apt:
+        update_cache: yes
+        force_apt_get: yes
+
+    - name: 2. Nettoyer les packages obsolètes (apt autoremove)
+      apt:
+        autoremove: yes
+        purge: yes
+
+    - name: 3. Libérer de l'espace Docker (Docker System Prune)
+      command: docker system prune -a --force
+      failed_when: false
+    - name: 4. Vérifier le statut des conteneurs de l'infrastructure
+      command: docker ps
+      register: docker_status
+
+    - name: 5. Afficher le rapport final dans le terminal
+      debug:
+        msg: "{{ docker_status.stdout_lines }}"
