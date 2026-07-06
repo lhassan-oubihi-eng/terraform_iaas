@@ -1,38 +1,41 @@
-# Monitoring & Automation Project
+# Infrastructure & Monitoring Automation Project
 
-This project provides a complete solution for infrastructure monitoring and automation.
+Ce projet offre une solution complète pour le déploiement et la surveillance d'infrastructures informatiques. Il automatise la création des serveurs avec **Terraform** et la configuration logicielle avec **Ansible**, tout en assurant une visibilité constante via une pile de monitoring (**Prometheus & Grafana**).
 
-## 📂 Project Structure
-- **/monitoring**: Contains Docker Compose configuration for Prometheus, Grafana, and Alertmanager.
-- **/terraform**: Contains Terraform files for infrastructure provisioning.
-- **/ansible**: Contains Ansible playbooks for automated server configuration.
+## 📂 Structure du projet
+```text
+/
+├── ansible/          # Playbooks et inventaires Ansible
+├── monitoring/       # Configurations Docker et Monitoring
+├── terraform/        # Fichiers de configuration Terraform (.tf)
+└── README.md         # Documentation du projet
+🛠 Guide d'utilisation
+Pour déployer et configurer l'infrastructure, suivez ces étapes dans l'ordre :
 
-## 🚀 Quick Start
+1. Infrastructure (Terraform)
+Initialisez et déployez les ressources nécessaires :
 
-### 1. Infrastructure Provisioning
-```bash
+Bash
 cd terraform
 terraform init
 terraform apply
-```
+2. Automatisation (Ansible)
+Une fois l'infrastructure en place, configurez les services :
 
-### 2. Configuration Management
-```bash
-cd ../ansible
-ansible-playbook -i inventory.ini playbook.yml
-```
+Bash
+ansible-playbook -i ansible/inventory.ini ansible/playbook.yml
+📈 Monitoring & Observabilité
+Le système inclut un tableau de bord pour visualiser les métriques en temps réel.
 
-### 3. Monitoring Deployment
-```bash
-cd ../monitoring
-docker-compose up -d
-```
+Prometheus : Collecte les données.
 
-## 🛠 Technologies Used
-- **IaC**: Terraform
-- **Automation**: Ansible
-- **Monitoring**: Prometheus, Grafana, Alertmanager
-- **Containerization**: Docker & Docker Compose
+Grafana : Visualisation des performances (CPU, RAM, Réseau).
 
----
-*Internship Project - Lhassan Oubihi*
+📋 Prérequis
+Ansible installé sur votre machine locale.
+
+Terraform installé.
+
+Accès SSH configuré pour les cibles.
+
+Développé par : Lhassan Oubihi
