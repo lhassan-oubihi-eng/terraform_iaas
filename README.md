@@ -1,41 +1,44 @@
-# Infrastructure & Monitoring Automation Project
+# 🚀 Infrastructure & Monitoring Automation Project
 
-Ce projet offre une solution complète pour le déploiement et la surveillance d'infrastructures informatiques. Il automatise la création des serveurs avec **Terraform** et la configuration logicielle avec **Ansible**, tout en assurant une visibilité constante via une pile de monitoring (**Prometheus & Grafana**).
+Ce projet propose une solution complète pour l'automatisation de l'infrastructure (IaC) et la mise en place d'un système de monitoring proactif. 🎯
+
+---
 
 ## 📂 Structure du projet
 ```text
 /
-├── ansible/          # Playbooks et inventaires Ansible
-├── monitoring/       # Configurations Docker et Monitoring
-├── terraform/        # Fichiers de configuration Terraform (.tf)
-└── README.md         # Documentation du projet
-🛠 Guide d'utilisation
-Pour déployer et configurer l'infrastructure, suivez ces étapes dans l'ordre :
+├── ansible/          # ⚙️ Playbooks et inventaires Ansible
+├── monitoring/       # 📊 Configurations Docker, Prometheus & Grafana
+├── terraform/        # 🏗️ Scripts de déploiement (IaC)
+└── README.md         # 📝 Documentation
 
-1. Infrastructure (Terraform)
+🛠 Guide d'utilisation
+Pour déployer et configurer l'infrastructure, suivez ces étapes :
+
+1. Infrastructure (Terraform) 🏗️
 Initialisez et déployez les ressources nécessaires :
 
 Bash
 cd terraform
 terraform init
 terraform apply
-2. Automatisation (Ansible)
-Une fois l'infrastructure en place, configurez les services :
+2. Automatisation (Ansible) ⚙️
+Configurez les services et les hôtes :
 
 Bash
 ansible-playbook -i ansible/inventory.ini ansible/playbook.yml
 📈 Monitoring & Observabilité
-Le système inclut un tableau de bord pour visualiser les métriques en temps réel.
+Le système assure une surveillance continue :
 
-Prometheus : Collecte les données.
+✅ CPU & RAM usage : Suivi des performances en temps réel.
 
-Grafana : Visualisation des performances (CPU, RAM, Réseau).
+✅ Docker containers status : État de santé de vos conteneurs.
+
+✅ Alerting systems : Notifications automatiques (Discord/Email) en cas d'anomalie 🔔.
 
 📋 Prérequis
-Ansible installé sur votre machine locale.
+Ansible & Terraform installés.
 
-Terraform installé.
+Accès SSH configuré pour les serveurs cibles.
 
-Accès SSH configuré pour les cibles.
-
-Développé par : Lhassan Oubihi
+Développé avec passion par : Lhassan Oubihi 💻
