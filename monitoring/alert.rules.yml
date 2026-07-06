@@ -1,0 +1,20 @@
+groups:
+  - name: production_alerts
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "السيرفر متوقف! (Instance {{ $labels.instance }} down)"
+          description: "لم يتمكن Prometheus من جلب البيانات من هاد السيرفر."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "الديسك ديالك كيعمر!"
+          description: "بقات أقل من 10% فالمساحة ديال الديسك."
