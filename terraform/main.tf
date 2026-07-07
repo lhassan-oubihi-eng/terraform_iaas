@@ -19,6 +19,7 @@ resource "docker_network" "monitoring_net" {
 resource "docker_volume" "portainer_data" { name = "portainer_data" }
 resource "docker_volume" "grafana_data"   { name = "grafana_data" }
 resource "docker_volume" "db_data"        { name = "wordpress_db_data" }
+resource "docker_volume" "jenkins_data"   { name = "jenkins_data" }
 
 # غانقولو لـ MySQL ما تبدا حتى يشعل الـ Monitoring كامل باش نقسمو الضغط د الـ ريزو
 resource "docker_image" "mysql_img" {
@@ -209,12 +210,13 @@ resource "docker_container" "nginx" {
   networks_advanced { name = docker_network.monitoring_net.name }
   depends_on = [docker_container.wordpress]
   restart = "always"
-}# ==============================================================================
+}
+
+# ==============================================================================
 # 3. CI/CD & CONFIGURATION MANAGEMENT LAYER (Controlled Pull Setup)
 # ==============================================================================
 
-
-# 3. تـشـغـيـل Ansible كـ Container مـعـزول (يـطـلـق الـ Playbook ويـطـفـى)
+# تشغيل Ansible كـ Container معزول (يطلق الـ Playbook ويطفى)
 resource "docker_container" "ansible_runner" {
   name  = "ansible_provisioner"
   image = "cytopia/ansible:latest"
@@ -233,4 +235,8 @@ resource "docker_container" "ansible_runner" {
   
   networks_advanced { name = docker_network.monitoring_net.name }
   depends_on = [docker_container.nginx]
+
+  lifecycle {
+    create_before_destroy = false
+  }
 }
