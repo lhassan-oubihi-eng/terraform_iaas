@@ -21,21 +21,18 @@ resource "docker_volume" "grafana_data"   { name = "grafana_data" }
 resource "docker_volume" "db_data"        { name = "wordpress_db_data" }
 resource "docker_volume" "jenkins_data"   { name = "jenkins_data" }
 
-# غانقولو لـ MySQL ما تبدا حتى يشعل الـ Monitoring كامل باش نقسمو الضغط د الـ ريزو
 resource "docker_image" "mysql_img" {
   name         = "mysql:8.0"
   keep_locally = true
-  depends_on   = [docker_container.prometheus, docker_container.grafana]
 }
 
 resource "docker_image" "wordpress_img" {
   name         = "wordpress:latest"
   keep_locally = true
-  depends_on   = [docker_container.mysql]
 }
 
 # ==============================================================================
-# 1. MONITORING LAYER (غادي تشعل هي اللولى أوتوماتيكياً حيت ما تابعا لـ حد)
+# 1. MONITORING LAYER
 # ==============================================================================
 resource "docker_container" "prometheus" {
   name  = "prometheus"
@@ -44,14 +41,29 @@ resource "docker_container" "prometheus" {
     internal = 9090
     external = 9090
   }
-  volumes {
-    host_path      = abspath("${path.module}/../monitoring/prometheus.yml")
-    container_path = "/etc/prometheus/prometheus.yml"
+  
+  # هـنـا غـانـعـطـيـوه الـ كـونـفـيـك نـيـشـان بـ تـمـريـر كـود مـبـاشـر بـاش يـتـهـنـى مـن الـ مـسـارات
+  upload {
+    content = <<EOT
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['node_exporter:9100']
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+EOT
+    file    = "/etc/prometheus/prometheus.yml"
   }
-  volumes {
-    host_path      = abspath("${path.module}/../monitoring/alert.rules.yml")
-    container_path = "/etc/prometheus/alert.rules.yml"
-  }
+  
   networks_advanced { name = docker_network.monitoring_net.name }
   restart = "always"
 }
@@ -64,10 +76,17 @@ resource "docker_container" "alertmanager" {
     internal = 9093
     external = 9093
   }
-  volumes {
-    host_path      = abspath("${path.module}/../monitoring/alertmanager.yml")
-    container_path = "/etc/alertmanager/alertmanager.yml"
+  
+  upload {
+    content = <<EOT
+route:
+  receiver: 'default-receiver'
+receivers:
+  - name: 'default-receiver'
+EOT
+    file    = "/etc/alertmanager/alertmanager.yml"
   }
+  
   networks_advanced { name = docker_network.monitoring_net.name }
   restart = "always"
 }
@@ -173,7 +192,7 @@ resource "docker_container" "portainer" {
 }
 
 # ==============================================================================
-# 2. WEB & DATABASE LAYER (ماعاندهاش ضغط دابا حيت الـ Monitoring غايكون ديجا تيليشارجا)
+# 2. WEB & DATABASE LAYER
 # ==============================================================================
 resource "docker_container" "mysql" {
   name  = "db_voip_tf"
@@ -203,20 +222,32 @@ resource "docker_container" "nginx" {
     internal = 80
     external = 8080
   }
-  volumes {
-    host_path      = abspath("${path.module}/nginx.conf")
-    container_path = "/etc/nginx/nginx.conf"
+  
+  upload {
+    content = <<EOT
+events {}
+http {
+    server {
+        listen 80;
+        location / {
+            proxy_pass http://web_voip_tf:80;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }
+}
+EOT
+    file    = "/etc/nginx/nginx.conf"
   }
+  
   networks_advanced { name = docker_network.monitoring_net.name }
   depends_on = [docker_container.wordpress]
   restart = "always"
 }
 
 # ==============================================================================
-# 3. CI/CD & CONFIGURATION MANAGEMENT LAYER (Controlled Pull Setup)
+# 3. CI/CD & CONFIGURATION MANAGEMENT LAYER
 # ==============================================================================
-
-# تشغيل Ansible كـ Container معزول (يطلق الـ Playbook ويطفى)
 resource "docker_container" "ansible_runner" {
   name  = "ansible_provisioner"
   image = "cytopia/ansible:latest"
