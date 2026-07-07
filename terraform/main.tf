@@ -213,10 +213,7 @@ resource "docker_container" "nginx" {
 # 3. CI/CD & CONFIGURATION MANAGEMENT LAYER (Controlled Pull Setup)
 # ==============================================================================
 
-#  حط هاد السطر فقط فـ بلاصتهم:
-data "docker_container" "jenkins" {
-  name = "jenkins_ci_cd"
-}
+
 # 3. تـشـغـيـل Ansible كـ Container مـعـزول (يـطـلـق الـ Playbook ويـطـفـى)
 resource "docker_container" "ansible_runner" {
   name  = "ansible_provisioner"
@@ -235,5 +232,5 @@ resource "docker_container" "ansible_runner" {
   command     = ["ansible-playbook", "-i", "localhost,", "playbook.yml"]
   
   networks_advanced { name = docker_network.monitoring_net.name }
-  depends_on = [docker_container.jenkins]
+  depends_on = [docker_container.nginx]
 }
