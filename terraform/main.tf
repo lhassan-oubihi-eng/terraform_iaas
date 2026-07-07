@@ -246,6 +246,10 @@ resource "docker_container" "jenkins" {
   networks_advanced { name = docker_network.monitoring_net.name }
   restart    = "always"
   depends_on = [docker_container.nginx]
+ 
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 # 3. تـشـغـيـل Ansible كـ Container مـعـزول (يـطـلـق الـ Playbook ويـطـفـى)
