@@ -40,7 +40,8 @@ terraform --version
 
 1. **Clone the repository and navigate to the Terraform workspace:**
 ```bash
-cd full_project/terraform
+git clone [https://github.com/lhassan-oubihi-eng/terraform_iaas.git](https://github.com/lhassan-oubihi-eng/terraform_iaas.git)
+cd terraform_iaas/full_project/terraform
 ```
 
 2. **Initialize the project workspace to download the necessary Docker providers:**
