@@ -17,6 +17,7 @@
     - name: 3. Libérer de l'espace Docker (Docker System Prune)
       command: docker system prune -a --force
       failed_when: false
+
     - name: 4. Vérifier le statut des conteneurs de l'infrastructure
       command: docker ps
       register: docker_status
@@ -24,3 +25,14 @@
     - name: 5. Afficher le rapport final dans le terminal
       debug:
         msg: "{{ docker_status.stdout_lines }}"
+
+    - name: 6. Envoyer le rapport à Discord
+      uri:
+        url: "https://discordapp.com/api/webhooks/1524058502673334422/Lm16H7MdHhrkhjyOyGqoKFDmKRoASqwYGJ31IjlNp6DZEUtwxNcoi2zkTEpotTsOiaN6"
+        method: POST
+        body_format: json
+        body:
+          username: "Ansible Bot"
+          avatar_url: "https://ansible.com/favicon.ico"
+          content: "📊 **Rapport de Maintenance Ansible (3h00)**\n```text\n{{ docker_status.stdout }}\n```"
+        status_code: 204

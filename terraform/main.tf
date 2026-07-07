@@ -10,7 +10,7 @@ terraform {
 provider "docker" {}
 
 # ==============================================================================
-# 0. NETWORKS & VOLUMES
+# 0. NETWORKS, VOLUMES & IMAGES
 # ==============================================================================
 resource "docker_network" "monitoring_net" {
   name = "monitoring_network"
@@ -20,46 +20,21 @@ resource "docker_volume" "portainer_data" { name = "portainer_data" }
 resource "docker_volume" "grafana_data"   { name = "grafana_data" }
 resource "docker_volume" "db_data"        { name = "wordpress_db_data" }
 
-# ==============================================================================
-# 1. WEB & DATABASE LAYER
-# ==============================================================================
-resource "docker_container" "mysql" {
-  name  = "db_voip_tf"
-  image = "mysql:8.0"
-  env   = ["MYSQL_ROOT_PASSWORD=somewordpress", "MYSQL_DATABASE=wordpress", "MYSQL_USER=wordpress", "MYSQL_PASSWORD=wordpress"]
-  networks_advanced { name = docker_network.monitoring_net.name }
-  volumes {
-    volume_name    = docker_volume.db_data.name
-    container_path = "/var/lib/mysql"
-  }
+# غانقولو لـ MySQL ما تبدا حتى يشعل الـ Monitoring كامل باش نقسمو الضغط د الـ ريزو
+resource "docker_image" "mysql_img" {
+  name         = "mysql:8.0"
+  keep_locally = true
+  depends_on   = [docker_container.prometheus, docker_container.grafana]
 }
 
-resource "docker_container" "wordpress" {
-  name  = "web_voip_tf"
-  image = "wordpress:latest"
-  env   = ["WORDPRESS_DB_HOST=db_voip_tf:3306", "WORDPRESS_DB_USER=wordpress", "WORDPRESS_DB_PASSWORD=wordpress", "WORDPRESS_DB_NAME=wordpress"]
-  networks_advanced { name = docker_network.monitoring_net.name }
-  depends_on = [docker_container.mysql]
-}
-
-resource "docker_container" "nginx" {
-  name  = "nginx_server"
-  image = "nginx:latest"
-  ports {
-    internal = 80
-    external = 8080
-  }
-  volumes {
-    # هنا صححنا المسار حيت nginx.conf كاين مع main.tf ف نفس الفولدر
-    host_path      = abspath("${path.module}/nginx.conf")
-    container_path = "/etc/nginx/nginx.conf"
-  }
-  networks_advanced { name = docker_network.monitoring_net.name }
-  depends_on = [docker_container.wordpress]
+resource "docker_image" "wordpress_img" {
+  name         = "wordpress:latest"
+  keep_locally = true
+  depends_on   = [docker_container.mysql]
 }
 
 # ==============================================================================
-# 2. MONITORING LAYER
+# 1. MONITORING LAYER (غادي تشعل هي اللولى أوتوماتيكياً حيت ما تابعا لـ حد)
 # ==============================================================================
 resource "docker_container" "prometheus" {
   name  = "prometheus"
@@ -173,9 +148,6 @@ resource "docker_container" "node_exporter" {
   restart = "always"
 }
 
-# ==============================================================================
-# 3. MANAGEMENT LAYER
-# ==============================================================================
 resource "docker_container" "portainer" {
   name  = "portainer_management"
   image = "portainer/portainer-ce:latest"
@@ -196,5 +168,45 @@ resource "docker_container" "portainer" {
     container_path = "/data"
   }
   networks_advanced { name = docker_network.monitoring_net.name }
+  restart = "always"
+}
+
+# ==============================================================================
+# 2. WEB & DATABASE LAYER (ماعاندهاش ضغط دابا حيت الـ Monitoring غايكون ديجا تيليشارجا)
+# ==============================================================================
+resource "docker_container" "mysql" {
+  name  = "db_voip_tf"
+  image = docker_image.mysql_img.image_id
+  env   = ["MYSQL_ROOT_PASSWORD=somewordpress", "MYSQL_DATABASE=wordpress", "MYSQL_USER=wordpress", "MYSQL_PASSWORD=wordpress"]
+  networks_advanced { name = docker_network.monitoring_net.name }
+  volumes {
+    volume_name    = docker_volume.db_data.name
+    container_path = "/var/lib/mysql"
+  }
+  restart = "always"
+}
+
+resource "docker_container" "wordpress" {
+  name  = "web_voip_tf"
+  image = docker_image.wordpress_img.image_id
+  env   = ["WORDPRESS_DB_HOST=db_voip_tf:3306", "WORDPRESS_DB_USER=wordpress", "WORDPRESS_DB_PASSWORD=wordpress", "WORDPRESS_DB_NAME=wordpress"]
+  networks_advanced { name = docker_network.monitoring_net.name }
+  depends_on = [docker_container.mysql]
+  restart = "always"
+}
+
+resource "docker_container" "nginx" {
+  name  = "nginx_server"
+  image = "nginx:latest"
+  ports {
+    internal = 80
+    external = 8080
+  }
+  volumes {
+    host_path      = abspath("${path.module}/nginx.conf")
+    container_path = "/etc/nginx/nginx.conf"
+  }
+  networks_advanced { name = docker_network.monitoring_net.name }
+  depends_on = [docker_container.wordpress]
   restart = "always"
 }
