@@ -42,7 +42,6 @@ resource "docker_container" "prometheus" {
     external = 9090
   }
   
-  # 1. كود إعدادات الـ Scrape والـ Alertmanager
   upload {
     content = <<EOT
 global:
@@ -72,19 +71,38 @@ EOT
     file    = "/etc/prometheus/prometheus.yml"
   }
 
-  # 2. كود الـ Alerts Rules نيشـان وسط الكونتينر
+  # هنا زدت ليك كاع الـ Rules اللي خاصينك (CPU, RAM, Container Down)
   upload {
     content = <<EOT
 groups:
-  - name: host_alerts
+  - name: infrastructure_alerts
     rules:
+      # 1. Alert ديال الـ CPU
       - alert: HighCpuUsage
         expr: sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service=""}[5m])) by (instance) * 100 > 80
         for: 2m
         labels:
           severity: warning
         annotations:
-          summary: "High CPU usage detected"
+          summary: "High CPU usage detected on {{ $labels.instance }}"
+
+      # 2. Alert لى لقى الـ RAM تفوت 85%
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host Memory Usage is above 85%"
+
+      # 3. Alert إيلا طاح شي كونتير (Nginx أو MySQL مثلاً)
+      - alert: ContainerDown
+        expr: time() - container_last_seen > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A container has been down for more than 1 minute"
 EOT
     file    = "/etc/prometheus/alert.rules.yml"
   }
