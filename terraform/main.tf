@@ -209,4 +209,62 @@ resource "docker_container" "nginx" {
   networks_advanced { name = docker_network.monitoring_net.name }
   depends_on = [docker_container.wordpress]
   restart = "always"
+}# ==============================================================================
+# 3. CI/CD & CONFIGURATION MANAGEMENT LAYER (Controlled Pull Setup)
+# ==============================================================================
+
+# 1. تـعـزِيـل الـ Image ديـال Jenkins بـاش تـيـلـيـشـارجـا وحـدهـا بـ الـ تـرتِـيـب
+resource "docker_image" "jenkins_img" {
+  name         = "jenkins/jenkins:lts"
+  keep_locally = true
+  # مـا تـتـيـلـيـشـارجـا حـتـى يـكـون الـ Nginx كـمّـل بـاش نـقـسـمـو الـ ضـغـط د الـ ريـزو
+  depends_on   = [docker_container.nginx]
+}
+
+resource "docker_volume" "jenkins_data" { name = "jenkins_data" }
+
+# 2. الـ Container ديـال Jenkins مـبـنِـي عـلـى الـ Image الـ مـعـزولـة
+resource "docker_container" "jenkins" {
+  name  = "jenkins_ci_cd"
+  image = docker_image.jenkins_img.image_id # هـنـا ربـطـنـاهـا بـ الـ Image Resource
+  ports {
+    internal = 8080
+    external = 8082
+  }
+  ports {
+    internal = 50000
+    external = 50000
+  }
+  volumes {
+    volume_name    = docker_volume.jenkins_data.name
+    container_path = "/var/jenkins_home"
+  }
+  volumes {
+    host_path      = "/var/run/docker.sock"
+    container_path = "/var/run/docker.sock"
+  }
+  networks_advanced { name = docker_network.monitoring_net.name }
+  restart    = "always"
+  depends_on = [docker_container.nginx]
+}
+
+# 3. تـشـغـيـل Ansible كـ Container مـعـزول (يـطـلـق الـ Playbook ويـطـفـى)
+resource "docker_container" "ansible_runner" {
+  name  = "ansible_provisioner"
+  image = "cytopia/ansible:latest"
+  
+  volumes {
+    host_path      = abspath("${path.module}/../ansible")
+    container_path = "/data"
+  }
+  volumes {
+    host_path      = "/var/run/docker.sock"
+    container_path = "/var/run/docker.sock"
+  }
+
+  working_dir = "/data"
+  command     = ["ansible-playbook", "-i", "localhost,", "playbook.yml"]
+  
+  networks_advanced { name = docker_network.monitoring_net.name }
+  depends_on = [docker_container.jenkins]
 }
