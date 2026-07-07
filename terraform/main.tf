@@ -42,11 +42,19 @@ resource "docker_container" "prometheus" {
     external = 9090
   }
   
-  # هـنـا غـانـعـطـيـوه الـ كـونـفـيـك نـيـشـان بـ تـمـريـر كـود مـبـاشـر بـاش يـتـهـنـى مـن الـ مـسـارات
+  # 1. كود إعدادات الـ Scrape والـ Alertmanager
   upload {
     content = <<EOT
 global:
   scrape_interval: 15s
+
+rule_files:
+  - "/etc/prometheus/alert.rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
 
 scrape_configs:
   - job_name: 'prometheus'
@@ -62,6 +70,23 @@ scrape_configs:
       - targets: ['cadvisor:8080']
 EOT
     file    = "/etc/prometheus/prometheus.yml"
+  }
+
+  # 2. كود الـ Alerts Rules نيشـان وسط الكونتينر
+  upload {
+    content = <<EOT
+groups:
+  - name: host_alerts
+    rules:
+      - alert: HighCpuUsage
+        expr: sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service=""}[5m])) by (instance) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+EOT
+    file    = "/etc/prometheus/alert.rules.yml"
   }
   
   networks_advanced { name = docker_network.monitoring_net.name }
