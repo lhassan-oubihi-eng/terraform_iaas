@@ -131,7 +131,7 @@ sudo docker run -d --name web_voip_tf --restart always \
   -e WORDPRESS_DB_NAME=wordpress \
   wordpress:latest
 
-# 8. Nginx Reverse Proxy
+# 8. Nginx Reverse Proxy (معدل بـ الـ Headers لتصحيح الـ Redirect والـ CSS)
 sudo mkdir -p /etc/nginx
 sudo tee /etc/nginx/nginx.conf > /dev/null << 'EOT'
 events {}
@@ -140,10 +140,12 @@ http {
         listen 80;
         location / {
             proxy_pass http://web_voip_tf:80;
-            proxy_set_header Host $host;
+            proxy_set_header Host $host:8080; # إعلام الـ WordPress بالبورت الخارجي
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host:8080;
+            proxy_set_header X-Forwarded-Port 8080;
         }
     }
 }
@@ -154,3 +156,7 @@ sudo docker run -d --name nginx_server --restart always \
   -p 8080:80 \
   -v /etc/nginx/nginx.conf:/etc/nginx/nginx.conf \
   nginx:latest
+
+# خطوة أوتوماتيكية لتعديل wp-config.php فور تشغيل الحاوية لضبط الـ URLs والـ CSS
+sleep 15
+sudo docker exec web_voip_tf sed -i "/<?php/a define('WP_HOME', 'http://' . \$_SERVER['HTTP_HOST']);\ndefine('WP_SITEURL', 'http://' . \$_SERVER['HTTP_HOST']);\n\$_SERVER['REQUEST_URI'] = str_replace(\"/wp-admin/\", \"/wp-admin/\", \$_SERVER['REQUEST_URI']);" wp-config.php || true
