@@ -1,82 +1,65 @@
-# Automated Multi-Container Infrastructure with Terraform & Docker
+# 🚀 Multi-Container Application with Prometheus & Grafana Monitoring
 
-This repository contains a fully automated, containerized infrastructure deploying a WordPress website backed by a MySQL database, route-managed via an Nginx Reverse Proxy, and completely monitored using the Prometheus & Grafana ecosystem.
-
----
-
-## 🏗️ Architecture Overview
-
-The system is split into three main architectural layers:
-
-1. **Web & Database Layer:**
-   * **WordPress (`web_voip_tf`):** The core content management system.
-   * **MySQL (`db_voip_tf`):** Secured relational database management system initialized with persistent volumes.
-   * **Nginx (`nginx_server`):** Acts as a Reverse Proxy directing external traffic, handling dynamic upstream routing, and managing custom timeouts.
-
-2. **Monitoring & Alerting Layer:**
-   * **Prometheus:** Scrapes system and operational metrics across the network dynamically.
-   * **Alertmanager:** Formatted to capture Prometheus metrics and trigger system alerts based on preset operational thresholds.
-   * **cAdvisor:** Analyzes and exposes resource usage (CPU, Memory, Network) from the running containers.
-   * **Node Exporter:** Exposes hardware and OS-level metrics from the host machine.
-
-3. **Management Layer:**
-   * **Portainer (`portainer_management`):** GUI platform for granular Docker container management and live logging.
+Ce projet permet de déployer automatiquement une infrastructure complète sur AWS à l'aide de **Terraform** et **Docker**. Elle comprend un serveur WordPress (avec proxy inverse Nginx et base de données MySQL), un serveur Jenkins, ainsi qu'une stack de monitoring complète (Prometheus, Grafana, cAdvisor, Node Exporter, et Alertmanager connecté à Discord).
 
 ---
 
-## 🚀 Quick Start (Deployment Guide)
+## 🛠️ Prérequis
 
-Since the infrastructure relies on Terraform environment runtime detection wrappers (`abspath` and `path.module`), you don't need to manually change any filesystem paths.
+Avant de commencer, assurez-vous d'avoir :
+* **Terraform** installé sur votre machine locale.
+* Un compte **AWS** (ou AWS Academy) avec des identifiants valides.
+* Une paire de clés SSH AWS téléchargée (ex: `my-aws-key.pem`)
 
-### Prerequisites
-Make sure you have Docker and Terraform installed on your system.
+---
+
+## 🚀 Configuration et Déploiement
+
+### 1. Configuration des Identifiants AWS
+Pour des raisons de sécurité, les clés d'accès AWS ne doivent **jamais** être écrites en dur dans le code Terraform. Vous devez les exporter temporairement dans l'environnement de votre terminal.
+
+Ouvrez votre terminal et exécutez les commandes suivantes en remplaçant les valeurs par vos propres clés AWS :
 
 ```bash
-docker --version
-terraform --version
+# Configuration des variables d'environnement pour Terraform
+export TF_VAR_access_key="VOTRE_AWS_ACCESS_KEY_ID"
+export TF_VAR_secret_key="VOTRE_AWS_SECRET_ACCESS_KEY"
+
+# Si vous utilisez AWS Academy, ajoutez également le token de session :
+# export TF_VAR_token="VOTRE_AWS_SESSION_TOKEN"
 ```
 
-### Deployment Steps
+> 💡 **Où trouver ces clés ?**
+> * **AWS Classique :** Dans la console AWS ➡️ Security Credentials ➡️ Create Access Key.
+> * **AWS Academy :** Cliquez sur "AWS Details" (à côté du bouton vert Start Lab) puis sur "Show" en face de *AWS CLI login credentials*.
 
-1. **Clone the repository and navigate to the Terraform workspace:**
-```bash
-git clone [https://github.com/lhassan-oubihi-eng/terraform_iaas.git](https://github.com/lhassan-oubihi-eng/terraform_iaas.git)
-cd terraform_iaas/full_project/terraform
-```
+---
 
-2. **Initialize the project workspace to download the necessary Docker providers:**
+### 2. Déploiement avec Terraform
+
+Une fois les variables exportées, initialisez le projet et lancez le déploiement automatique :
+
 ```bash
+# Initialiser le répertoire (téléchargement des providers)
 terraform init
-```
 
-3. **Provision and spin up all containers automatically:**
-```bash
+# Déployer l'infrastructure sur AWS
 terraform apply -auto-approve
 ```
 
----
-
-## 🔍 Exposing Endpoints
-
-Once deployed successfully, the following infrastructure ports will be mapped locally:
-
-| Service | Port / Endpoint | Description |
-| :--- | :--- | :--- |
-| **WordPress / Web App** | `http://localhost:8080` | Main application website |
-| **Prometheus UI** | `http://localhost:9090` | Check scrape targets and query metrics |
-| **Grafana Dashboards** | `http://localhost:3000` | Data visualization dashboards |
-| **Portainer Dashboard** | `http://localhost:9443` | Container management GUI |
-| **Alertmanager UI** | `http://localhost:9093` | Alert threshold tracking dashboard |
-| **cAdvisor Metrics** | `http://localhost:8085` | Direct structural raw container metrics |
+Le script va automatiquement :
+1. Créer l'instance EC2 et le groupe de sécurité (Security Group) sur AWS.
+2. Installer Docker et configurer une mémoire Swap de 2Go.
+3. Télécharger et lancer l'ensemble des conteneurs via le script `setup.sh`.
 
 ---
 
-## 🛠️ Infrastructure Cleanup
+## 📊 Accès aux Services
 
-To safely tear down the entire infrastructure, remove active containers, and isolate the network setups, execute:
+Une fois le déploiement terminé, Terraform affichera l'adresse IP publique de votre instance. Vous pourrez accéder aux différents services via les ports suivants :
 
-```bash
-terraform destroy -auto-approve
-```
-
-> **Note:** Active persistent data volumes for MySQL, Portainer, and Grafana remain protected from unintended data loss.
+* **WordPress :** `http://<IP_PUBLIQUE>:8080` (Proxy Nginx)
+* **Jenkins :** `http://<IP_PUBLIQUE>:8081`
+* **Prometheus :** `http://<IP_PUBLIQUE>:9090`
+* **Grafana :** `http://<IP_PUBLIQUE>:3000` *(Dashboard Node Exporter : ID 1860)*
+* **Alertmanager :** `http://<IP_PUBLIQUE>:9093`
