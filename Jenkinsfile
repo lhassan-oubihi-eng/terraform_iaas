@@ -10,13 +10,16 @@ pipeline {
 
         stage('Setup Terraform Binary') {
             steps {
-                // Téléchargement automatique du binaire officiel de Terraform pour Linux AMD64
                 sh '''
                     if [ ! -f terraform ]; then
-                        echo "Downloading Terraform..."
-                        wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
-                        unzip -o terraform_1.5.7_linux_amd64.zip
-                        rm terraform_1.5.7_linux_amd64.zip
+                        echo "Downloading Terraform using curl..."
+                        # تحميل الملف باستعمال curl عوض wget
+                        curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o terraform.zip
+                        
+                        echo "Extracting Terraform..."
+                        # فك الضغط على الملف
+                        unzip -o terraform.zip
+                        rm terraform.zip
                         chmod +x terraform
                     fi
                 '''
@@ -26,7 +29,6 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('terraform') {
-                    // Exécution en utilisant le binaire qu'on vient de télécharger (../terraform)
                     sh '../terraform init'
                 }
             }
