@@ -1,316 +1,88 @@
-terraform {
-  required_providers {
-    docker = {
-      source  = "kreuzwerker/docker"
-      version = "3.0.1"
-    }
+provider "aws" {
+  region = "us-east-1" # بدّلها يلا كنتي خدام فـ شي ريجون أخرى
+}
+
+resource "aws_security_group" "monitoring_sg" {
+  name        = "monitoring_project_sg"
+  description = "Security group for DevOps monitoring project"
+
+  # Nginx (WordPress Proxy)
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Jenkins
+  ingress {
+    from_port   = 8081
+    to_port     = 8081
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Prometheus
+  ingress {
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Grafana
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Alertmanager
+  ingress {
+    from_port   = 9093
+    to_port     = 9093
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # cAdvisor
+  ingress {
+    from_port   = 8082
+    to_port     = 8082
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # SSH
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
-provider "docker" {}
+resource "aws_instance" "monitoring_server" {
+  ami           = "ami-0e2c8caa4b6378d8c" # Ubuntu 24.04 LTS فـ us-east-1
+  instance_type = "t3.medium"             # أحسن حيت الـ ستاك عامر بزاف
+  key_name      = "my-aws-key"            # سميت الـ Key Pair ديارك فـ AWS
 
-# ==============================================================================
-# 0. NETWORKS, VOLUMES & IMAGES
-# ==============================================================================
-resource "docker_network" "monitoring_net" {
-  name = "monitoring_network"
+  vpc_security_group_ids = [aws_security_group.monitoring_sg.id]
+  user_data              = file("setup.sh")
+
+  tags = {
+    Name = "DevOps-Monitoring-Server"
+  }
 }
 
-resource "docker_volume" "portainer_data" { name = "portainer_data" }
-resource "docker_volume" "grafana_data"   { name = "grafana_data" }
-resource "docker_volume" "db_data"        { name = "wordpress_db_data" }
-resource "docker_volume" "jenkins_data"   { name = "jenkins_data" }
-
-resource "docker_image" "mysql_img" {
-  name         = "mysql:8.0"
-  keep_locally = true
-}
-
-resource "docker_image" "wordpress_img" {
-  name         = "wordpress:latest"
-  keep_locally = true
-}
-
-# ==============================================================================
-# 1. MONITORING LAYER
-# ==============================================================================
-resource "docker_container" "prometheus" {
-  name  = "prometheus"
-  image = "prom/prometheus:latest"
-  ports {
-    internal = 9090
-    external = 9090
-  }
-  
-  upload {
-    content = <<EOT
-global:
-  scrape_interval: 15s
-
-rule_files:
-  - "/etc/prometheus/alert.rules.yml"
-
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets: ["alertmanager:9093"]
-
-scrape_configs:
-  - job_name: 'prometheus'
-    static_configs:
-      - targets: ['localhost:9090']
-
-  - job_name: 'node_exporter'
-    static_configs:
-      - targets: ['node_exporter:9100']
-
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['cadvisor:8080']
-EOT
-    file    = "/etc/prometheus/prometheus.yml"
-  }
-
-  # هنا زدت ليك كاع الـ Rules اللي خاصينك (CPU, RAM, Container Down)
-  upload {
-    content = <<EOT
-groups:
-  - name: infrastructure_alerts
-    rules:
-      # 1. Alert ديال الـ CPU
-      - alert: HighCpuUsage
-        expr: sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service=""}[5m])) by (instance) * 100 > 80
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High CPU usage detected on {{ $labels.instance }}"
-
-      # 2. Alert لى لقى الـ RAM تفوت 85%
-      - alert: HighMemoryUsage
-        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Host Memory Usage is above 85%"
-
-      # 3. Alert إيلا طاح شي كونتير (Nginx أو MySQL مثلاً)
-      - alert: ContainerDown
-        expr: time() - container_last_seen > 60
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "A container has been down for more than 1 minute"
-EOT
-    file    = "/etc/prometheus/alert.rules.yml"
-  }
-  
-  networks_advanced { name = docker_network.monitoring_net.name }
-  restart = "always"
-}
-
-resource "docker_container" "alertmanager" {
-  name    = "alertmanager"
-  image   = "prom/alertmanager:latest"
-  command = ["--config.file=/etc/alertmanager/alertmanager.yml"]
-  ports {
-    internal = 9093
-    external = 9093
-  }
-  
-  upload {
-    content = <<EOT
-route:
-  receiver: 'default-receiver'
-receivers:
-  - name: 'default-receiver'
-EOT
-    file    = "/etc/alertmanager/alertmanager.yml"
-  }
-  
-  networks_advanced { name = docker_network.monitoring_net.name }
-  restart = "always"
-}
-
-resource "docker_container" "grafana" {
-  name  = "grafana"
-  image = "grafana/grafana:latest"
-  ports {
-    internal = 3000
-    external = 3000
-  }
-  volumes {
-    volume_name    = docker_volume.grafana_data.name
-    container_path = "/var/lib/grafana"
-  }
-  networks_advanced { name = docker_network.monitoring_net.name }
-  restart = "always"
-}
-
-resource "docker_container" "cadvisor" {
-  name  = "cadvisor"
-  image = "gcr.io/cadvisor/cadvisor:v0.47.0"
-  ports {
-    internal = 8080
-    external = 8085
-  }
-  volumes {
-    host_path      = "/"
-    container_path = "/rootfs"
-    read_only      = true
-  }
-  volumes {
-    host_path      = "/var/run"
-    container_path = "/var/run"
-    read_only      = false
-  }
-  volumes {
-    host_path      = "/sys"
-    container_path = "/sys"
-    read_only      = true
-  }
-  volumes {
-    host_path      = "/var/lib/docker"
-    container_path = "/var/lib/docker"
-    read_only      = true
-  }
-  networks_advanced { name = docker_network.monitoring_net.name }
-  restart = "always"
-}
-
-resource "docker_container" "node_exporter" {
-  name  = "node_exporter"
-  image = "prom/node-exporter:latest"
-  ports {
-    internal = 9100
-    external = 9100
-  }
-  volumes {
-    host_path      = "/proc"
-    container_path = "/host/proc"
-    read_only      = true
-  }
-  volumes {
-    host_path      = "/sys"
-    container_path = "/host/sys"
-    read_only      = true
-  }
-  volumes {
-    host_path      = "/"
-    container_path = "/rootfs"
-    read_only      = true
-  }
-  command = [
-    "--path.procfs=/host/proc",
-    "--path.rootfs=/rootfs",
-    "--path.sysfs=/host/sys"
-  ]
-  networks_advanced { name = docker_network.monitoring_net.name }
-  restart = "always"
-}
-
-resource "docker_container" "portainer" {
-  name  = "portainer_management"
-  image = "portainer/portainer-ce:latest"
-  ports {
-    internal = 9443
-    external = 9443
-  }
-  ports {
-    internal = 9000
-    external = 9002
-  }
-  volumes {
-    host_path      = "/var/run/docker.sock"
-    container_path = "/var/run/docker.sock"
-  }
-  volumes {
-    volume_name    = docker_volume.portainer_data.name
-    container_path = "/data"
-  }
-  networks_advanced { name = docker_network.monitoring_net.name }
-  restart = "always"
-}
-
-# ==============================================================================
-# 2. WEB & DATABASE LAYER
-# ==============================================================================
-resource "docker_container" "mysql" {
-  name  = "db_voip_tf"
-  image = docker_image.mysql_img.image_id
-  env   = ["MYSQL_ROOT_PASSWORD=somewordpress", "MYSQL_DATABASE=wordpress", "MYSQL_USER=wordpress", "MYSQL_PASSWORD=wordpress"]
-  networks_advanced { name = docker_network.monitoring_net.name }
-  volumes {
-    volume_name    = docker_volume.db_data.name
-    container_path = "/var/lib/mysql"
-  }
-  restart = "always"
-}
-
-resource "docker_container" "wordpress" {
-  name  = "web_voip_tf"
-  image = docker_image.wordpress_img.image_id
-  env   = ["WORDPRESS_DB_HOST=db_voip_tf:3306", "WORDPRESS_DB_USER=wordpress", "WORDPRESS_DB_PASSWORD=wordpress", "WORDPRESS_DB_NAME=wordpress"]
-  networks_advanced { name = docker_network.monitoring_net.name }
-  depends_on = [docker_container.mysql]
-  restart = "always"
-}
-
-resource "docker_container" "nginx" {
-  name  = "nginx_server"
-  image = "nginx:latest"
-  ports {
-    internal = 80
-    external = 8080
-  }
-  
-  upload {
-    content = <<EOT
-events {}
-http {
-    server {
-        listen 80;
-        location / {
-            proxy_pass http://web_voip_tf:80;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-        }
-    }
-}
-EOT
-    file    = "/etc/nginx/nginx.conf"
-  }
-  
-  networks_advanced { name = docker_network.monitoring_net.name }
-  depends_on = [docker_container.wordpress]
-  restart = "always"
-}
-
-# ==============================================================================
-# 3. CI/CD & CONFIGURATION MANAGEMENT LAYER
-# ==============================================================================
-resource "docker_container" "ansible_runner" {
-  name  = "ansible_provisioner"
-  image = "cytopia/ansible:latest"
-  
-  volumes {
-    host_path      = abspath("${path.module}/../ansible")
-    container_path = "/data"
-  }
-  volumes {
-    host_path      = "/var/run/docker.sock"
-    container_path = "/var/run/docker.sock"
-  }
-
-  working_dir = "/data"
-  command     = ["ansible-playbook", "-i", "localhost,", "playbook.yml"]
-  
-  networks_advanced { name = docker_network.monitoring_net.name }
-  depends_on = [docker_container.nginx]
-
-  lifecycle {
-    create_before_destroy = false
-  }
+output "instance_public_ip" {
+  value = aws_instance.monitoring_server.public_ip
 }
