@@ -1,12 +1,20 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 provider "aws" {
-  region = "us-east-1" # بدّلها يلا كنتي خدام فـ شي ريجون أخرى
+  region = "us-east-1"
 }
 
 resource "aws_security_group" "monitoring_sg" {
-  name        = "monitoring_project_sg"
-  description = "Security group for DevOps monitoring project"
+  name        = "monitoring_io_sg_prod_final_v3"
+  description = "Allow Web, SSH, Jenkins and Monitoring traffic"
 
-  # Nginx (WordPress Proxy)
   ingress {
     from_port   = 8080
     to_port     = 8080
@@ -14,7 +22,6 @@ resource "aws_security_group" "monitoring_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Jenkins
   ingress {
     from_port   = 8081
     to_port     = 8081
@@ -22,7 +29,13 @@ resource "aws_security_group" "monitoring_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Prometheus
+  ingress {
+    from_port   = 50000
+    to_port     = 50000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   ingress {
     from_port   = 9090
     to_port     = 9090
@@ -30,7 +43,6 @@ resource "aws_security_group" "monitoring_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Grafana
   ingress {
     from_port   = 3000
     to_port     = 3000
@@ -38,7 +50,13 @@ resource "aws_security_group" "monitoring_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Alertmanager
+  ingress {
+    from_port   = 9443
+    to_port     = 9443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   ingress {
     from_port   = 9093
     to_port     = 9093
@@ -46,7 +64,6 @@ resource "aws_security_group" "monitoring_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # cAdvisor
   ingress {
     from_port   = 8082
     to_port     = 8082
@@ -54,7 +71,6 @@ resource "aws_security_group" "monitoring_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # SSH
   ingress {
     from_port   = 22
     to_port     = 22
@@ -71,18 +87,24 @@ resource "aws_security_group" "monitoring_sg" {
 }
 
 resource "aws_instance" "monitoring_server" {
-  ami           = "ami-0e2c8caa4b6378d8c" # Ubuntu 24.04 LTS فـ us-east-1
-  instance_type = "t3.medium"             # أحسن حيت الـ ستاك عامر بزاف
-  key_name      = "my-aws-key"            # سميت الـ Key Pair ديارك فـ AWS
+  ami           = "ami-04b70fa74e45c3917" # الـ AMI لّي صيفطتي نتا وكنتي خدام بيه قبيلة
+  instance_type = "t3.micro"             # رجعنا للـ t3.micro حيت الحساب ديالك تايقبلها
+  key_name      = "my-aws-key"            
 
-  vpc_security_group_ids = [aws_security_group.monitoring_sg.id]
-  user_data              = file("setup.sh")
+  security_groups = [aws_security_group.monitoring_sg.name]
 
-  tags = {
-    Name = "DevOps-Monitoring-Server"
+  root_block_device {
+    volume_size           = 20
+    volume_type           = "gp3"
+    delete_on_termination = true
   }
+
+  user_data = file("setup.sh")
+
+  tags = { Name = "DevOps-Automation-Station" }
 }
 
 output "instance_public_ip" {
-  value = aws_instance.monitoring_server.public_ip
+  value       = aws_instance.monitoring_server.public_ip
+  description = "Public IP of the EC2 Instance"
 }

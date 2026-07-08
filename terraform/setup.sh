@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bash/bin
 sudo apt-get update -y
 
 # تهيئة الـ Swap Memory ديال 2GB
