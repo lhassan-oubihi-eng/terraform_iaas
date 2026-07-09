@@ -11,6 +11,13 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# هاد المتغير هو اللي غيستقبل الـ Token فـ الـ Terminal بلا ما يتكتب فـ الكود
+variable "jenkins_prometheus_token" {
+  type        = string
+  sensitive   = true
+  description = "The Jenkins API Token for Prometheus basic auth"
+}
+
 resource "aws_security_group" "monitoring_sg" {
   name        = "monitoring_io_sg_prod_final_v3"
   description = "Allow Web, SSH, Jenkins and Monitoring traffic"
@@ -87,9 +94,9 @@ resource "aws_security_group" "monitoring_sg" {
 }
 
 resource "aws_instance" "monitoring_server" {
-  ami           = "ami-04b70fa74e45c3917" # الـ AMI لّي صيفطتي نتا وكنتي خدام بيه قبيلة
-  instance_type = "t3.micro"             # رجعنا للـ t3.micro حيت الحساب ديالك تايقبلها
-  key_name      = "my-aws-key"            
+  ami             = "ami-04b70fa74e45c3917" 
+  instance_type   = "t3.micro"              
+  key_name        = "my-aws-key"            
 
   security_groups = [aws_security_group.monitoring_sg.name]
 
@@ -99,7 +106,10 @@ resource "aws_instance" "monitoring_server" {
     delete_on_termination = true
   }
 
-  user_data = file("setup.sh")
+  # هنا السحر: كيمرر الـ token لملف setup.sh أوتوماتيكياً
+  user_data = templatefile("setup.sh", {
+    jenkins_token = var.jenkins_prometheus_token
+  })
 
   tags = { Name = "DevOps-Automation-Station" }
 }
