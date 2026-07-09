@@ -1,6 +1,14 @@
 pipeline {
     agent any
+
+    tools {
+        terraform 'terraform' 
+    }
     
+    environment {
+        AWS_CREDENTIALS = credentials('aws-access-key') 
+        JENKINS_TOKEN   = credentials('jenkins-prometheus-token') 
+    }    
     environment {
         AWS_CREDENTIALS = credentials('aws-access-key') 
         JENKINS_TOKEN   = credentials('jenkins-prometheus-token') 
