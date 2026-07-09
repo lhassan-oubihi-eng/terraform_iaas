@@ -1,7 +1,7 @@
 ---
 - name: Post-Deployment System Optimization and Hardening
   hosts: aws_servers
-  become: true  
+  become: true
 
   tasks:
     - name: 1. Mettre à jour le cache APT (apt update)
@@ -19,7 +19,7 @@
       changed_when: false
 
     - name: 4. Vérifier le statut des conteneurs de l'infrastructure
-      command: docker ps
+      command: "{% raw %}docker ps --format 'table {{.Names}}\t{{.Status}}'{% endraw %}"
       register: docker_status
       changed_when: false
 

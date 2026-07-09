@@ -225,3 +225,4 @@ sudo docker run -d --name nginx_server --restart always \
 
 sleep 15
 sudo docker exec web_voip_tf sed -i "/<?php/a define('WP_HOME', 'http://' . \$_SERVER['HTTP_HOST']);\ndefine('WP_SITEURL', 'http://' . \$_SERVER['HTTP_HOST']);\n\$_SERVER['REQUEST_URI'] = str_replace(\"/wp-admin/\", \"/wp-admin/\", \$_SERVER['REQUEST_URI']);" wp-config.php || true
+

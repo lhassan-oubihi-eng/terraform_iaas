@@ -2,6 +2,7 @@
 .terraform/
 *.tfstate
 *.tfstate.backup
+*.tfvars
 .terraform.lock.hcl
 
 # Ansible
@@ -14,3 +15,6 @@ __pycache__/
 .DS_Store
 terraform/tfplan
 alertmanager.yml
+*.pem
+*.tfstate*
+*.jar
