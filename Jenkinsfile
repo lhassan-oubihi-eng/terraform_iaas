@@ -30,13 +30,24 @@ pipeline {
             }
         }
         
+
+
+
         stage('Ansible Hardening') {
             steps {
                 dir('ansible') {
-                    // غنخليو أنسيبل يراني على السيرفر الجديد أوتوماتيكياً
-                    sh "ansible-playbook -i inventory.ini playbook.yml"
+                    sh '''
+                        # تثبيت Ansible أوتوماتيكياً داخل الكونتينر إذا لم يكن موجوداً
+                        if ! command -v ansible-playbook &> /dev/null; then
+                        echo "Ansible not found. Installing..."
+                            apt-get update && apt-get install -y ansible
+                fi
+                
+                # تشغيل الـ Playbook
+                ansible-playbook -i inventory.ini playbook.yml
+            '''
+                    }
                 }
             }
         }
     }
-}
