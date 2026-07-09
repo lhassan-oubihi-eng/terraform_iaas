@@ -56,4 +56,22 @@ pipeline {
     }
 }
         }
+    post {
+        success {
+            sh '''
+                curl -H "Content-Type: application/json" \
+                -X POST \
+                -d "{\\"content\\": \\"✅ **Terraform-Pipeline #${BUILD_NUMBER} SUCCESS**\\\\n السيرفر طالع ناضي والـ Pipeline دازت خضرة كاملة! 🚀\\\\n🔗 الـ IP الجديد: 52.72.248.55\\"}" \
+                "https://discordapp.com/api/webhooks/1524843805768028231/WQ4QMp_wxBmk1cAA0O-CWMfeipPLB0d3vUMwjM1R_iL1sI3dMfjOj5z6jAz2Vi2A9rRw"
+            '''
+        }
+        failure {
+            sh '''
+                curl -H "Content-Type: application/json" \
+                -X POST \
+                -d "{\\"content\\": \\"❌ **Terraform-Pipeline #${BUILD_NUMBER} FAILED**\\\\nوقع مشكل فـ الـ Pipeline. تشيك الـ Console Output أستاذ لحسن! 🛠️\\"}" \
+                "https://discordapp.com/api/webhooks/1524843805768028231/WQ4QMp_wxBmk1cAA0O-CWMfeipPLB0d3vUMwjM1R_iL1sI3dMfjOj5z6jAz2Vi2A9rRw"
+            '''
+        }
+    }
     }
