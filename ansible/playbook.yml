@@ -1,7 +1,7 @@
 ---
 - name: Post-Deployment System Optimization and Hardening
-  hosts: local
-  become: true  # باش يخدم بـ صلاحيات sudo أوتوماتيكياً
+  hosts: aws_servers
+  become: true  
 
   tasks:
     - name: 1. Mettre à jour le cache APT (apt update)
@@ -16,11 +16,12 @@
 
     - name: 3. Libérer de l'espace Docker (Docker System Prune)
       command: docker system prune -a --force
-      failed_when: false
+      changed_when: false
 
     - name: 4. Vérifier le statut des conteneurs de l'infrastructure
       command: docker ps
       register: docker_status
+      changed_when: false
 
     - name: 5. Afficher le rapport final dans le terminal
       debug:
@@ -34,5 +35,5 @@
         body:
           username: "Ansible Bot"
           avatar_url: "https://ansible.com/favicon.ico"
-          content: "📊 **Rapport de Maintenance Ansible (3h00)**\n```text\n{{ docker_status.stdout }}\n```"
+          content: "📊 **Rapport de Maintenance Ansible (AWS Cloud)**\n```text\n{{ docker_status.stdout }}\n```"
         status_code: 204
