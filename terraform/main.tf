@@ -19,7 +19,7 @@ variable "jenkins_prometheus_token" {
 }
 
 resource "aws_security_group" "monitoring_sg" {
-  name        = "monitoring_io_sg_prod_final_v3"
+  name        = "monitoring_io_sg_prod_final_v5"
   description = "Allow Web, SSH, Jenkins and Monitoring traffic"
 
   ingress {
