@@ -33,21 +33,20 @@ pipeline {
 
 
 
-        stage('Ansible Hardening') {
-            steps {
-                dir('ansible') {
-                    sh '''
-                        # تثبيت Ansible أوتوماتيكياً داخل الكونتينر إذا لم يكن موجوداً
-                        if ! command -v ansible-playbook &> /dev/null; then
-                        echo "Ansible not found. Installing..."
-                            apt-get update && apt-get install -y ansible
-                fi
+       stage('Ansible Hardening') {
+    steps {
+        dir('ansible') {
+            sh '''
+                # 1. إنشاء بيئة وهمية Python Virtual Environment وتثبيت Ansible فيها
+                python3 -m venv venv
+                ./venv/bin/pip install --upgrade pip
+                ./venv/bin/pip install ansible
                 
-                # تشغيل الـ Playbook
-                ansible-playbook -i inventory.ini playbook.yml
+                # 2. تشغيل الـ Playbook باستعمال الـ Ansible اللي عاد تنزل
+                ./venv/bin/ansible-playbook -i inventory.ini playbook.yml
             '''
-                    }
-                }
-            }
+        }
+    }
+}
         }
     }
