@@ -1,6 +1,6 @@
 ---
 - name: Post-Deployment System Optimization and Hardening
-  hosts: aws_servers
+  hosts: all
   become: true
 
   tasks:
