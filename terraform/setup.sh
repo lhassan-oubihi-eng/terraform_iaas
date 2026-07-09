@@ -8,12 +8,12 @@ sudo mkswap /swapfile
 sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
-# نزول Docker
+# تثبيت Docker
 sudo apt-get install -y docker.io
 sudo systemctl start docker
 sudo systemctl enable docker
 
-# كربيي الشبكة والفوليومات
+# إنشاء الشبكة والفوليومات
 sudo docker network create monitoring_network || true
 sudo docker volume create portainer_data || true
 sudo docker volume create grafana_data || true
@@ -40,7 +40,19 @@ sudo docker run -d --name cadvisor --restart always \
   -v /dev/disk/:/dev/disk:ro \
   gcr.io/cadvisor/cadvisor:v0.47.0
 
-# 3. Alertmanager Configuration
+# 3. Node Exporter
+sudo docker run -d --name node-exporter --restart always \
+  --network monitoring_network \
+  -p 9100:9100 \
+  -v "/proc:/host/proc:ro" \
+  -v "/sys:/host/sys:ro" \
+  -v "/:/rootfs:ro" \
+  prom/node-exporter:latest \
+  --path.procfs=/host/proc \
+  --path.sysfs=/host/sys \
+  --collector.filesystem.mount-points-exclude="^/(sys|proc|dev|host|etc)($|/)"
+
+# 4. Alertmanager Configuration
 sudo mkdir -p /etc/alertmanager
 sudo tee /etc/alertmanager/alertmanager.yml > /dev/null << 'EOT'
 global:
@@ -50,11 +62,12 @@ route:
   group_wait: 10s
   group_interval: 10s
   repeat_interval: 1h
-  receiver: 'web.hook'
+  receiver: 'discord'
 receivers:
-- name: 'web.hook'
-  webhook_configs:
-  - url: 'http://127.0.0.1:5001/'
+- name: 'discord'
+  discord_configs:
+  - webhook_url: 'https://discordapp.com/api/webhooks/1523633593908330700/uf-cQ4JS475uav9gYD4bDc8_mQunU4SDuu-UjHZqRoYz7m_6gM0B33MD1201BVXSCXs'
+    send_resolved: true
 inhibit_rules:
   - source_match:
       severity: 'critical'
@@ -69,11 +82,56 @@ sudo docker run -d --name alertmanager --restart always \
   -v /etc/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml \
   prom/alertmanager:latest
 
-# 4. Prometheus Configuration
+# 5. Alerting Rules
 sudo mkdir -p /etc/prometheus
+sudo tee /etc/prometheus/alert.rules.yml > /dev/null << 'EOT'
+groups:
+  - name: host_alerts
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "السيرفر متوقف! (Instance {{ $labels.instance }} down)"
+          description: "لم يتمكن Prometheus من جلب البيانات."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "الديسك ديالك كيعمر!"
+          description: "المساحة المتبقية أقل من 10%."
+
+      - alert: HighCPUUsage
+        expr: (sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_project=""}[5m])) by (instance) / sum(machine_cpu_cores) by (instance)) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected on container host"
+          description: "CPU usage is above 80% for more than 2 minutes."
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_Active_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Memory usage detected"
+          description: "Container host memory utilization is above 85%."
+EOT
+
+# 6. Prometheus Configuration
 sudo tee /etc/prometheus/prometheus.yml > /dev/null << 'EOT'
 global:
   scrape_interval: 15s
+
+rule_files:
+  - "alert.rules.yml"
 
 alerting:
   alertmanagers:
@@ -89,12 +147,19 @@ scrape_configs:
     static_configs:
       - targets: ['cadvisor:8080']
 
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
   - job_name: 'alertmanager'
     static_configs:
       - targets: ['alertmanager:9093']
 
   - job_name: 'jenkins'
     metrics_path: '/prometheus/'
+    basic_auth:
+      username: 'admin'
+      password: '${jenkins_token}'
     static_configs:
       - targets: ['jenkins_server:8080']
 EOT
@@ -103,16 +168,17 @@ sudo docker run -d --name prometheus --restart always \
   --network monitoring_network \
   -p 9090:9090 \
   -v /etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml \
+  -v /etc/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml \
   prom/prometheus:latest
 
-# 5. Grafana
+# 7. Grafana
 sudo docker run -d --name grafana --restart always \
   --network monitoring_network \
   -p 3000:3000 \
   -v grafana_data:/var/lib/grafana \
   grafana/grafana:latest
 
-# 6. MySQL
+# 8. MySQL
 sudo docker run -d --name db_voip_tf --restart always \
   --network monitoring_network \
   -e MYSQL_ROOT_PASSWORD=somewordpress \
@@ -122,7 +188,7 @@ sudo docker run -d --name db_voip_tf --restart always \
   -v wordpress_db_data:/var/lib/mysql \
   mysql:8.0
 
-# 7. WordPress
+# 9. WordPress
 sudo docker run -d --name web_voip_tf --restart always \
   --network monitoring_network \
   -e WORDPRESS_DB_HOST=db_voip_tf:3306 \
@@ -131,7 +197,7 @@ sudo docker run -d --name web_voip_tf --restart always \
   -e WORDPRESS_DB_NAME=wordpress \
   wordpress:latest
 
-# 8. Nginx Reverse Proxy (معدل بـ الـ Headers لتصحيح الـ Redirect والـ CSS)
+# 10. Nginx Reverse Proxy
 sudo mkdir -p /etc/nginx
 sudo tee /etc/nginx/nginx.conf > /dev/null << 'EOT'
 events {}
@@ -140,7 +206,7 @@ http {
         listen 80;
         location / {
             proxy_pass http://web_voip_tf:80;
-            proxy_set_header Host $host:8080; # إعلام الـ WordPress بالبورت الخارجي
+            proxy_set_header Host $host:8080;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
@@ -157,6 +223,5 @@ sudo docker run -d --name nginx_server --restart always \
   -v /etc/nginx/nginx.conf:/etc/nginx/nginx.conf \
   nginx:latest
 
-# خطوة أوتوماتيكية لتعديل wp-config.php فور تشغيل الحاوية لضبط الـ URLs والـ CSS
 sleep 15
 sudo docker exec web_voip_tf sed -i "/<?php/a define('WP_HOME', 'http://' . \$_SERVER['HTTP_HOST']);\ndefine('WP_SITEURL', 'http://' . \$_SERVER['HTTP_HOST']);\n\$_SERVER['REQUEST_URI'] = str_replace(\"/wp-admin/\", \"/wp-admin/\", \$_SERVER['REQUEST_URI']);" wp-config.php || true
