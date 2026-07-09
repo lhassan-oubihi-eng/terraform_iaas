@@ -35,17 +35,14 @@ pipeline {
 
        stage('Ansible Hardening') {
     steps {
-        dir('ansible') {
-            sh '''
-                # 1. إنشاء بيئة وهمية Python Virtual Environment وتثبيت Ansible فيها
-                python3 -m venv venv
-                ./venv/bin/pip install --upgrade pip
-                ./venv/bin/pip install ansible
-                
-                # 2. تشغيل الـ Playbook باستعمال الـ Ansible اللي عاد تنزل
-                ./venv/bin/ansible-playbook -i inventory.ini playbook.yml
-            '''
-        }
+        sh '''
+            chmod 400 terraform/my-aws-key.pem
+            ssh -o StrictHostKeyChecking=no -i terraform/my-aws-key.pem ubuntu@52.72.248.55 '
+                sudo apt-get update
+                sudo apt-get install -y ansible
+                sudo ansible-pull -U https://github.com/lhassan-oubihi-eng/terraform_iaas.git ansible/playbook.yml
+            '
+        '''
     }
 }
         }
