@@ -6,9 +6,12 @@ pipeline {
     }
     
     environment {
-        AWS_CREDENTIALS = credentials('aws-access-key') 
-        JENKINS_TOKEN   = credentials('jenkins-prometheus-token') 
-    }
+    // هنا كنربطو كل متغير بالـ Credential ديالو من Jenkins ديريكت
+    AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
+    AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    
+    JENKINS_TOKEN         = credentials('jenkins-prometheus-token')
+}    
     
     stages {
         stage('Git Checkout') {
