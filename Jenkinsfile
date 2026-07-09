@@ -33,16 +33,26 @@ pipeline {
 
 
 
-       stage('Ansible Hardening') {
+      stage('Ansible Hardening') {
     steps {
-        sh '''
-            chmod 400 terraform/my-aws-key.pem
-            ssh -o StrictHostKeyChecking=no -i terraform/my-aws-key.pem ubuntu@52.72.248.55 '
-                sudo apt-get update
-                sudo apt-get install -y ansible
-                sudo ansible-pull -U https://github.com/lhassan-oubihi-eng/terraform_iaas.git ansible/playbook.yml
-            '
-        '''
+        // هنا جينكينز غايجيب الملف الآمن ويحط المسار ديالو فـ متغير $SSH_KEY
+        withCredentials([file(credentialsId: 'aws-ec2-ssh-key', variable: 'SSH_KEY')]) {
+            sh '''
+                echo "🔑 Using secure SSH key from Jenkins credentials..."
+                
+                # ضبط صلاحيات المفتاح السري المؤقت
+                chmod 400 "$SSH_KEY"
+                
+                echo "🚀 Connecting to AWS EC2 instance ($instance_public_ip) via SSH..."
+                
+                # الاتصال وتشغيل Ansible بنجاح
+                ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ubuntu@52.72.248.55 '
+                    sudo apt-get update
+                    sudo apt-get install -y ansible git
+                    sudo ansible-pull -U https://github.com/lhassan-oubihi-eng/terraform_iaas.git ansible/playbook.yml
+                '
+            '''
+        }
     }
 }
         }
